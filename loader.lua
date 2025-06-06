@@ -1,59 +1,60 @@
-local isfile = isfile or function(file)
-	local suc, res = pcall(function()
-		return readfile(file)
-	end)
-	return suc and res ~= nil and res ~= ''
-end
-local delfile = delfile or function(file)
-	writefile(file, '')
+-- Define utility functions
+local function isfile(path)
+    local ok, result = pcall(function() return readfile(path) end)
+    return ok and result ~= nil and result ~= ""
 end
 
-local function downloadFile(path, func)
-	if not isfile(path) then
-		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
-		end)
-		if not suc or res == '404: Not Found' then
-			error(res)
-		end
-		if path:find('.lua') then
-			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
-		end
-		writefile(path, res)
-	end
-	return (func or readfile)(path)
+local function downloadFile(url, path)
+    if not isfile(path) then
+        local success, response = pcall(function()
+            return game:HttpGet(url)
+        end)
+        if success then
+            writefile(path, response)
+            print("[VisualWave] Downloaded: " .. path)
+        else
+            warn("[VisualWave] Failed to download: " .. path)
+        end
+    else
+        print("[VisualWave] Already exists: " .. path)
+    end
 end
 
-local function wipeFolder(path)
-	if not isfolder(path) then return end
-	for _, file in listfiles(path) do
-		if file:find('loader') then continue end
-		if isfile(file) and select(1, readfile(file):find('--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.')) == 1 then
-			delfile(file)
-		end
-	end
+-- Create folder structure
+local folders = {
+    "VisualWave",
+    "VisualWave/gui",
+    "VisualWave/modules",
+    "VisualWave/assets",
+}
+
+for _, folder in ipairs(folders) do
+    if not isfolder(folder) then
+        makefolder(folder)
+        print("[VisualWave] Created folder: " .. folder)
+    end
 end
 
-for _, folder in {'newvape', 'newvape/games', 'newvape/profiles', 'newvape/assets', 'newvape/libraries', 'newvape/guis'} do
-	if not isfolder(folder) then
-		makefolder(folder)
-	end
+-- Download files into correct folders
+local baseURL = "https://raw.githubusercontent.com/BeefReal/VisualWave-V1/main/"
+
+local filesToDownload = {
+    ["VisualWave/MainScript.lua"] = baseURL .. "MainScript.lua",
+    ["VisualWave/Loader.lua"] = baseURL .. "Loader.lua",
+    ["VisualWave/gui/custom_gui.lua"] = baseURL .. "gui/custom_gui.lua",
+    ["VisualWave/modules/Fly.lua"] = baseURL .. "modules/Fly.lua",
+    ["VisualWave/modules/InfiniteJump.lua"] = baseURL .. "modules/InfiniteJump.lua",
+    ["VisualWave/README.md"] = baseURL .. "README.md",
+}
+
+for path, url in pairs(filesToDownload) do
+    downloadFile(url, path)
 end
 
-if not shared.VapeDeveloper then
-	local _, subbed = pcall(function() 
-		return game:HttpGet('https://github.com/7GrandDadPGN/VapeV4ForRoblox') 
-	end)
-	local commit = subbed:find('currentOid')
-	commit = commit and subbed:sub(commit + 13, commit + 52) or nil
-	commit = commit and #commit == 40 and commit or 'main'
-	if commit == 'main' or (isfile('newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt') or '') ~= commit then
-		wipeFolder('newvape')
-		wipeFolder('newvape/games')
-		wipeFolder('newvape/guis')
-		wipeFolder('newvape/libraries')
-	end
-	writefile('newvape/profiles/commit.txt', commit)
+-- Load GUI automatically
+local guiPath = "VisualWave/gui/custom_gui.lua"
+if isfile(guiPath) then
+    loadstring(readfile(guiPath))()
+else
+    warn("[VisualWave] GUI script not found: " .. guiPath)
 end
-
-return loadstring(downloadFile('newvape/main.lua'), 'main')()
